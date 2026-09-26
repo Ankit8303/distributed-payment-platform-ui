@@ -31,6 +31,28 @@ export interface FormatMoneyOptions {
   showCurrency?: boolean;
 }
 
+const numberFormatCache = new Map<string, Intl.NumberFormat>();
+
+function getNumberFormatter(
+  locale: string,
+  currency: string,
+  showCurrency: boolean,
+  decimals: number
+): Intl.NumberFormat {
+  const key = `${locale}|${currency}|${showCurrency}|${decimals}`;
+  let formatter = numberFormatCache.get(key);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(locale, {
+      style: showCurrency ? "currency" : "decimal",
+      currency: currency.toUpperCase(),
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    });
+    numberFormatCache.set(key, formatter);
+  }
+  return formatter;
+}
+
 /**
  * Formats an integer minor-unit amount into a localized currency string.
  * Uses integer arithmetic to avoid IEEE-754 floating point inaccuracies.
@@ -46,10 +68,5 @@ export function formatMinorUnits(
   const divisor = Math.pow(10, decimals);
   const majorValue = amountMinor / divisor;
 
-  return new Intl.NumberFormat(locale, {
-    style: showCurrency ? "currency" : "decimal",
-    currency: currency.toUpperCase(),
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(majorValue);
+  return getNumberFormatter(locale, currency, showCurrency, decimals).format(majorValue);
 }

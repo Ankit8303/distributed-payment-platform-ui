@@ -22,7 +22,9 @@ $requiredPaths = @(
     "package.json",
     "tsconfig.json",
     ".gitignore",
-    ".env.example"
+    ".env.example",
+    "Dockerfile",
+    ".dockerignore"
 )
 
 $missing = 0

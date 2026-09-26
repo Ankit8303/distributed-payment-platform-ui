@@ -1,6 +1,24 @@
 import type { NextConfig } from "next";
 import path from "path";
 
+export function getConnectSrcOrigins(apiUrl?: string): string[] {
+  const origins = new Set<string>(["'self'", "http://localhost:8080", "http://127.0.0.1:8080"]);
+  if (apiUrl && typeof apiUrl === "string") {
+    try {
+      const parsed = new URL(apiUrl.trim());
+      if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+        origins.add(parsed.origin);
+      }
+    } catch {
+      // Ignore malformed URL; default origins preserved
+    }
+  }
+  return Array.from(origins);
+}
+
+const apiOrigin = process.env.NEXT_PUBLIC_API_URL;
+const connectSrc = getConnectSrcOrigins(apiOrigin).join(" ");
+
 const securityHeaders = [
   {
     key: "X-DNS-Prefetch-Control",
@@ -34,7 +52,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https:",
       "font-src 'self'",
-      "connect-src 'self' http://localhost:8080 http://127.0.0.1:8080",
+      `connect-src ${connectSrc}`,
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -45,7 +63,12 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  compress: true,
+  output: "standalone",
   outputFileTracingRoot: path.resolve(__dirname),
+  experimental: {
+    optimizePackageImports: ["lucide-react"],
+  },
   async headers() {
     return [
       {

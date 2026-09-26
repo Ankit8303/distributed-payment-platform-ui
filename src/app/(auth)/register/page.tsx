@@ -12,6 +12,13 @@ export const metadata: Metadata = {
 export default function RegisterPage() {
   return (
     <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col justify-between p-6">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-emerald-600 focus:text-white focus:rounded-md focus:shadow-md"
+      >
+        Skip to main content
+      </a>
+
       {/* Background radial gradients */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl" />
@@ -32,7 +39,7 @@ export default function RegisterPage() {
         </div>
       </header>
 
-      <main className="relative z-10 flex-grow flex items-center justify-center py-12">
+      <main id="main-content" className="relative z-10 flex-grow flex items-center justify-center py-12">
         <RegisterForm />
       </main>
 

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AppProviders } from "@/providers/app-providers";
+import { NetworkStatusIndicator } from "@/components/feedback/network-status-indicator";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -17,7 +18,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="antialiased bg-[#090d16] text-slate-100 min-h-screen">
-        <AppProviders>{children}</AppProviders>
+        <AppProviders>
+          <NetworkStatusIndicator />
+          {children}
+        </AppProviders>
       </body>
     </html>
   );

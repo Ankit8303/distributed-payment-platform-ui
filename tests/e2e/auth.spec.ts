@@ -53,3 +53,89 @@ test.describe("Phase F1 Authentication E2E Tests", () => {
     await expect(passwordError).toContainText("at least 12 characters");
   });
 });
+
+test.describe("Phase F8-A Open-Redirect Protection & Login Security", () => {
+  const mockHeader = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64");
+  const mockPayload = Buffer.from(
+    JSON.stringify({
+      sub: "auth-user-f8a-uuid",
+      role: "CUSTOMER",
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    })
+  ).toString("base64");
+  const validToken = `${mockHeader}.${mockPayload}.mock-sig`;
+
+  test.beforeEach(async ({ page }) => {
+    await page.route("**/api/v1/auth/login", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          accessToken: validToken,
+          refreshToken: "mock-valid-refresh-token",
+          tokenType: "Bearer",
+          expiresIn: 3600,
+        }),
+      });
+    });
+
+    await page.route("**/api/v1/auth/refresh", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          accessToken: validToken,
+          refreshToken: "mock-valid-refresh-token",
+          tokenType: "Bearer",
+          expiresIn: 3600,
+        }),
+      });
+    });
+  });
+
+  test("normal login with valid internal redirect redirects to requested internal route", async ({ page }) => {
+    await page.goto("/login?redirect=%2Fdashboard");
+    await page.fill("#login-email", "user@example.com");
+    await page.fill("#login-password", "Password123!");
+    await page.click('button[type="submit"]');
+
+    await expect(page).toHaveURL(/\/dashboard/);
+    expect(page.url()).not.toContain("evil");
+  });
+
+  test("rejects external HTTPS redirect and falls back to safe default route (/)", async ({ page }) => {
+    await page.goto("/login?redirect=https%3A%2F%2Fevil.example.com%2Fsteal-token");
+    await page.fill("#login-email", "user@example.com");
+    await page.fill("#login-password", "Password123!");
+    await page.click('button[type="submit"]');
+
+    // Should redirect to root "/" instead of evil.example.com
+    await page.waitForURL((url) => url.pathname === "/");
+    expect(page.url()).not.toContain("evil.example.com");
+    expect(new URL(page.url()).pathname).toBe("/");
+  });
+
+  test("rejects protocol-relative redirect and falls back to safe default route (/)", async ({ page }) => {
+    await page.goto("/login?redirect=%2F%2Fevil.example.com");
+    await page.fill("#login-email", "user@example.com");
+    await page.fill("#login-password", "Password123!");
+    await page.click('button[type="submit"]');
+
+    await page.waitForURL((url) => url.pathname === "/");
+    expect(page.url()).not.toContain("evil.example.com");
+    expect(new URL(page.url()).pathname).toBe("/");
+  });
+
+  test("rejects backslash evasion redirect and falls back to safe default route (/)", async ({ page }) => {
+    await page.goto("/login?redirect=%2F%5Cevil.example.com");
+    await page.fill("#login-email", "user@example.com");
+    await page.fill("#login-password", "Password123!");
+    await page.click('button[type="submit"]');
+
+    await page.waitForURL((url) => url.pathname === "/");
+    expect(page.url()).not.toContain("evil.example.com");
+    expect(new URL(page.url()).pathname).toBe("/");
+  });
+});
+

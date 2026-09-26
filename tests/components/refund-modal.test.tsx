@@ -93,10 +93,10 @@ describe("RefundModal Component", () => {
     await waitFor(() => {
       expect(createRefundSpy).toHaveBeenCalledTimes(1);
       const callArgs = createRefundSpy.mock.calls[0];
-      expect(callArgs[0]).toBe(paymentId);
-      expect(callArgs[1]).toEqual({ amountMinor: 2500, reason: "Item returned" });
+      expect(callArgs![0]).toBe(paymentId);
+      expect(callArgs![1]).toEqual({ amountMinor: 2500, reason: "Item returned" });
       // UUIDv4 format idempotency key
-      expect(callArgs[2]).toMatch(
+      expect(callArgs![2]).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
       );
     });

@@ -92,6 +92,22 @@ export function minorToDecimalString(
   return `${sign}${whole.toString()}.${paddedFrac}`;
 }
 
+const moneyFormatCache = new Map<string, Intl.NumberFormat>();
+
+function getMoneyFormatter(currency: string): Intl.NumberFormat {
+  let formatter = moneyFormatCache.get(currency);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    moneyFormatCache.set(currency, formatter);
+  }
+  return formatter;
+}
+
 /**
  * Formats minor units with currency code for accessible, user-friendly presentation.
  * e.g., formatMoney(1050, "USD") -> "$10.50 USD"
@@ -105,13 +121,7 @@ export function formatMoney(
 
   try {
     const numericVal = Number(decimalStr);
-    const formatted = new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: upperCurrency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(numericVal);
-    return formatted;
+    return getMoneyFormatter(upperCurrency).format(numericVal);
   } catch {
     // Fallback if currency code is unusual
     return `${decimalStr} ${upperCurrency}`;

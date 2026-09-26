@@ -104,12 +104,12 @@ describe("PayoutForm Component", () => {
     await waitFor(() => {
       expect(createPayoutSpy).toHaveBeenCalledTimes(1);
       const args = createPayoutSpy.mock.calls[0];
-      expect(args[0]).toEqual({
+      expect(args![0]).toEqual({
         accountId: "11111111-1111-1111-1111-111111111111",
         amountMinor: 15000,
         currency: "USD",
       });
-      expect(args[1]).toMatch(
+      expect(args![1]).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
       );
     });

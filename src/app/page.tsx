@@ -14,7 +14,14 @@ import {
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col justify-between selection:bg-emerald-500 selection:text-black">
+    <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col justify-between selection:bg-emerald-500 selection:text-black">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-emerald-600 focus:text-white focus:rounded-md focus:shadow-md"
+      >
+        Skip to main content
+      </a>
+
       {/* Background radial gradients */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute -top-40 -left-40 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl" />
@@ -58,8 +65,10 @@ export default function Home() {
           </div>
         </header>
 
-        {/* Hero Section */}
-        <section className="text-center md:text-left space-y-6 max-w-3xl mb-16">
+        {/* Main Content */}
+        <main id="main-content">
+          {/* Hero Section */}
+          <section className="text-center md:text-left space-y-6 max-w-3xl mb-16">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-slate-800/60 border border-slate-700/60 text-xs font-mono text-emerald-400">
             <ShieldCheck className="h-3.5 w-3.5" />
             Backend Authority: Frozen Spring Boot Core
@@ -170,12 +179,13 @@ export default function Home() {
             </div>
           </div>
         </section>
+        </main>
       </div>
 
       {/* Footer */}
       <footer className="border-t border-slate-800/60 py-6 text-center text-xs text-slate-500">
         <p>Distributed Payment Platform UI &bull; Phase F0 Bootstrap &bull; Frozen Backend Authority</p>
       </footer>
-    </main>
+    </div>
   );
 }

@@ -4,6 +4,7 @@ import React, { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
+import { ProtectedRoute } from "@/components/layout/protected-route";
 import { PayoutForm } from "@/features/payouts/components/payout-form";
 
 function PayoutNewContent() {
@@ -21,7 +22,8 @@ function PayoutNewContent() {
 
 export default function NewPayoutPage() {
   return (
-    <div className="space-y-6 max-w-2xl mx-auto">
+    <ProtectedRoute allowedRoles={["MERCHANT", "ADMIN", "SYSTEM"]}>
+      <div className="space-y-6 max-w-2xl mx-auto">
       {/* Header section with Single h1 */}
       <div>
         <div className="flex items-center gap-2 mb-2">
@@ -50,6 +52,7 @@ export default function NewPayoutPage() {
       >
         <PayoutNewContent />
       </Suspense>
-    </div>
+      </div>
+    </ProtectedRoute>
   );
 }

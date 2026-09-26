@@ -6,6 +6,7 @@ import Link from "next/link";
 import { z } from "zod";
 import { useAuth } from "@/features/auth/auth-context";
 import { ApiError } from "@/lib/api/client";
+import { getSafeRedirectUrl } from "@/lib/auth/safe-redirect";
 import { Eye, EyeOff, Lock, Mail, AlertCircle, Loader2 } from "lucide-react";
 
 const loginSchema = z.object({
@@ -25,7 +26,7 @@ export function LoginForm() {
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const redirectUrl = searchParams?.get("redirect") || "/";
+  const redirectUrl = getSafeRedirectUrl(searchParams?.get("redirect"));
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
