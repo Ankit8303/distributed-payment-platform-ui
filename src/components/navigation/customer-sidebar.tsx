@@ -58,6 +58,27 @@ const navItems: NavItem[] = [
       </svg>
     ),
   },
+  {
+    name: 'Payouts',
+    href: '/payouts/new',
+    icon: ({ className }) => (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        strokeWidth={1.5}
+        stroke="currentColor"
+        className={className}
+        aria-hidden="true"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"
+        />
+      </svg>
+    ),
+  },
 ];
 
 export const CustomerSidebar: React.FC<CustomerSidebarProps> = ({
@@ -72,7 +93,8 @@ export const CustomerSidebar: React.FC<CustomerSidebarProps> = ({
         const isActive =
           pathname === item.href ||
           pathname?.startsWith(item.href + '/') ||
-          (item.name === 'Payments' && pathname?.startsWith('/payments'));
+          (item.name === 'Payments' && pathname?.startsWith('/payments')) ||
+          (item.name === 'Payouts' && pathname?.startsWith('/payouts'));
 
         return (
           <Link
