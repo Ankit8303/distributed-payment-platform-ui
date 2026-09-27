@@ -18,6 +18,9 @@ export function getConnectSrcOrigins(apiUrl?: string): string[] {
 
 const apiOrigin = process.env.NEXT_PUBLIC_API_URL;
 const connectSrc = getConnectSrcOrigins(apiOrigin).join(" ");
+const scriptSrc = process.env.NODE_ENV === "production"
+  ? "'self' 'unsafe-inline'"
+  : "'self' 'unsafe-eval' 'unsafe-inline'";
 
 const securityHeaders = [
   {
@@ -48,7 +51,7 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+      `script-src ${scriptSrc}`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https:",
       "font-src 'self'",
