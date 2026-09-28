@@ -35,6 +35,9 @@ jobs:
       - name: Verify environment configuration
         run: pwsh ./scripts/verification/verify-env.ps1
 
+      - name: Dependency vulnerability audit
+        run: npm audit --audit-level=high
+
       - name: Gitleaks repository secret scan
         uses: gitleaks/gitleaks-action@v3
         env:
