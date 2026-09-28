@@ -15,7 +15,9 @@ if (maxP95Ms <= 0 || maxP99Ms <= 0 || maxErrorRate < 0 || maxErrorRate > 1) {
   throw new Error("Performance thresholds are invalid");
 }
 
-const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+const nextCli = process.platform === "win32"
+  ? "./node_modules/next/dist/bin/next"
+  : "./node_modules/next/dist/bin/next";
 let server;
 let startedHere = false;
 
@@ -89,12 +91,20 @@ function assertBudget(result) {
   }
 }
 
+async function stopServer() {
+  if (!server || server.killed) return;
+  server.kill("SIGTERM");
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  if (!server.killed) server.kill("SIGKILL");
+}
+
 async function main() {
   try {
     const startupStarted = performance.now();
-    server = spawn(npmCommand, ["run", "start"], {
+    server = spawn(process.execPath, [nextCli, "start"], {
       env: { ...process.env, PORT: "3000", HOSTNAME: "127.0.0.1" },
       stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
     });
     startedHere = true;
 
@@ -113,11 +123,7 @@ async function main() {
     assertBudget(await runBenchmark("/api/readyz"));
     console.log("Phase 9 runtime performance gate passed.");
   } finally {
-    if (startedHere && server && !server.killed) {
-      server.kill("SIGTERM");
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      if (!server.killed) server.kill("SIGKILL");
-    }
+    if (startedHere) await stopServer();
   }
 }
 
