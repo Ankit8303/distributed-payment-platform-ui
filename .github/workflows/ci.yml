@@ -106,6 +106,42 @@ jobs:
             exit 1
           fi
 
+      - name: Verify Production Security Headers
+        run: |
+          HEADERS="$(curl -sS -D - -o /dev/null http://127.0.0.1:3000/)"
+          echo "$HEADERS"
+
+          echo "$HEADERS" | grep -qi '^strict-transport-security:' || {
+            echo "ERROR: Strict-Transport-Security header missing"
+            exit 1
+          }
+
+          echo "$HEADERS" | grep -qi '^x-content-type-options: nosniff' || {
+            echo "ERROR: X-Content-Type-Options header missing or incorrect"
+            exit 1
+          }
+
+          CSP="$(printf '%s\n' "$HEADERS" | tr -d '\r' | grep -i '^content-security-policy:' || true)"
+          if [ -z "$CSP" ]; then
+            echo "ERROR: Content-Security-Policy header missing"
+            exit 1
+          fi
+
+          printf '%s\n' "$CSP" | grep -q "object-src 'none'" || {
+            echo "ERROR: CSP object-src restriction missing"
+            exit 1
+          }
+
+          if printf '%s\n' "$CSP" | grep -q "unsafe-eval"; then
+            echo "ERROR: Production CSP contains unsafe-eval"
+            exit 1
+          fi
+
+          if printf '%s\n' "$CSP" | grep -q "style-src 'self' 'unsafe-inline'"; then
+            echo "ERROR: Production CSP permits unsafe-inline styles"
+            exit 1
+          fi
+
       - name: Stop and Cleanup Container
         if: always()
         run: |
