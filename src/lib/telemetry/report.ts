@@ -30,6 +30,11 @@ function sanitizePath(value: unknown): string | undefined {
   if (!path) return undefined;
 
   try {
+    if (typeof window === "undefined") {
+      return path.startsWith("/") && !path.startsWith("//")
+        ? path.split("?")[0].split("#")[0]
+        : undefined;
+    }
     const parsed = new URL(path, window.location.origin);
     return parsed.origin === window.location.origin
       ? parsed.pathname.slice(0, MAX_PATH_LENGTH)
