@@ -48,8 +48,8 @@ jobs:
       - name: Install Playwright Browser (Chromium)
         run: npx playwright install --with-deps chromium
 
-      - name: Playwright E2E Accessibility & Invariant Tests
-        run: npx playwright test tests/e2e/accessibility.spec.ts
+      - name: Playwright E2E Full Regression Suite
+        run: npx playwright test
 
       - name: Production Build Verification
         env:
