@@ -35,6 +35,9 @@ jobs:
       - name: Verify environment configuration
         run: pwsh ./scripts/verification/verify-env.ps1
 
+      - name: Verify production deployment configuration
+        run: node ./scripts/deployment/verify-production-config.mjs deploy/.env.production.example
+
       - name: Dependency vulnerability audit
         run: npm audit --audit-level=high
 
@@ -85,7 +88,6 @@ jobs:
           PERF_MAX_ERROR_RATE: 0
         run: npm run performance:runtime
 
-
       - name: Upload Playwright Report on Failure
         if: failure()
         uses: actions/upload-artifact@v6
@@ -115,7 +117,7 @@ jobs:
         run: |
           echo "Starting container in background..."
           docker run -d --name frontend-smoke -p 3000:3000 distributed-payment-platform-ui:ci
-          
+
           echo "Waiting for container healthcheck..."
           READY=0
           for i in $(seq 1 30); do
