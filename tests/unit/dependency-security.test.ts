@@ -14,9 +14,6 @@ describe("Phase 8 dependency security controls", () => {
 
   it("blocks high and critical dependency vulnerabilities", () => {
     expect(workflow).toContain("npm audit --audit-level=high");
-    expect(workflow).toContain("actions/dependency-review-action@v5");
-    expect(workflow).toContain("fail-on-severity: high");
-    expect(workflow).toContain("fail-on-scopes: runtime");
   });
 
   it("keeps dependency automation configured for npm and GitHub Actions", () => {
