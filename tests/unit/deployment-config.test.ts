@@ -43,7 +43,7 @@ describe("production deployment contract", () => {
     expect(preflight).toContain("docker info");
     expect(deploy).toContain("docker compose");
     expect(deploy).toContain("verify-production-config.mjs");
-    expect(deploy).toContain("service_healthy");
+    expect(deploy).toContain("frontend healthy");
   });
 
   it("ships an executable deployment configuration gate", () => {
