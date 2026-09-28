@@ -43,16 +43,13 @@ jobs:
 
       - name: Validate Caddy reverse proxy configuration
         run: |
-          docker run --rm \
-            -e DOMAIN=app.example.com \
-            -v "${PWD}/deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" \
-            caddy:2-alpine \
-            caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          docker run --rm             -e DOMAIN=app.example.com             -v "${PWD}/deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro"             caddy:2-alpine             caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
       - name: Validate VPS operational scripts
         run: |
           sh -n deploy/scripts/preflight.sh
           sh -n deploy/scripts/deploy.sh
+          sh -n deploy/scripts/recover.sh
           docker info >/dev/null
           docker compose version
 
@@ -164,7 +161,37 @@ jobs:
           curl -sS -f http://127.0.0.1:3000/api/readyz > /tmp/readyz.json
           grep -q '"status":"ready"' /tmp/readyz.json
           curl -sS -f http://127.0.0.1:3000/ > /dev/null
-          echo "Runtime health, readiness, and landing-page smoke probes passed."
+          echo "Initial runtime health, readiness, and landing-page smoke probes passed."
+
+          echo "Testing container restart recovery..."
+          docker restart frontend-smoke >/dev/null
+          READY=0
+          for i in $(seq 1 30); do
+            STATUS="$(docker inspect --format='{{.State.Health.Status}}' frontend-smoke 2>/dev/null || true)"
+            echo "Recovery healthcheck attempt $i: ${STATUS:-starting}"
+            if [ "$STATUS" = "healthy" ]; then
+              READY=1
+              break
+            fi
+            if [ "$STATUS" = "unhealthy" ]; then
+              echo "ERROR: Container failed healthcheck after restart. Logs:"
+              docker logs frontend-smoke
+              exit 1
+            fi
+            sleep 1
+          done
+
+          if [ $READY -ne 1 ]; then
+            echo "ERROR: Container did not recover to healthy state after restart. Logs:"
+            docker logs frontend-smoke
+            exit 1
+          fi
+
+          curl -sS -f http://127.0.0.1:3000/api/healthz > /tmp/recovered-healthz.json
+          grep -q '"status":"ok"' /tmp/recovered-healthz.json
+          curl -sS -f http://127.0.0.1:3000/api/readyz > /tmp/recovered-readyz.json
+          grep -q '"status":"ready"' /tmp/recovered-readyz.json
+          echo "Container restart recovery verification passed."
 
       - name: Verify Production Security Headers
         run: |
@@ -181,23 +208,27 @@ jobs:
             exit 1
           }
 
-          CSP="$(printf '%s\n' "$HEADERS" | tr -d '\r' | grep -i '^content-security-policy:' || true)"
+          CSP="$(printf '%s
+' "$HEADERS" | tr -d '' | grep -i '^content-security-policy:' || true)"
           if [ -z "$CSP" ]; then
             echo "ERROR: Content-Security-Policy header missing"
             exit 1
           fi
 
-          printf '%s\n' "$CSP" | grep -q "object-src 'none'" || {
+          printf '%s
+' "$CSP" | grep -q "object-src 'none'" || {
             echo "ERROR: CSP object-src restriction missing"
             exit 1
           }
 
-          if printf '%s\n' "$CSP" | grep -q "unsafe-eval"; then
+          if printf '%s
+' "$CSP" | grep -q "unsafe-eval"; then
             echo "ERROR: Production CSP contains unsafe-eval"
             exit 1
           fi
 
-          if printf '%s\n' "$CSP" | grep -q "style-src 'self' 'unsafe-inline'"; then
+          if printf '%s
+' "$CSP" | grep -q "style-src 'self' 'unsafe-inline'"; then
             echo "ERROR: Production CSP permits unsafe-inline styles"
             exit 1
           fi
