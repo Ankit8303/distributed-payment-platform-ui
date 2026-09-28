@@ -28,7 +28,7 @@ describe("apiFetch Phase 3 reliability", () => {
     const init = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
     expect(init).toBeDefined();
     expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer access-old");
-    expect(new Headers(init.headers).get("X-Correlation-ID")).toBeTruthy();
+    expect(new Headers(init?.headers).get("X-Correlation-ID")).toBeTruthy();
   });
 
   it("refreshes once and retries a safe request after 401", async () => {
@@ -48,8 +48,10 @@ describe("apiFetch Phase 3 reliability", () => {
     await expect(apiFetch<{ ok: boolean }>("/api/v1/accounts/me")).resolves.toEqual({ ok: true });
     expect(refresh).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    const [, retryInit] = fetchMock.mock.calls[1];
-    expect(new Headers(retryInit.headers).get("Authorization")).toBe("Bearer access-new");
+    const retryCall = fetchMock.mock.calls[1] as [string, RequestInit] | undefined;
+    expect(retryCall).toBeDefined();
+    const retryInit = retryCall?.[1];
+    expect(new Headers(retryInit?.headers).get("Authorization")).toBe("Bearer access-new");
   });
 
   it("deduplicates concurrent safe-request refresh callbacks", async () => {
