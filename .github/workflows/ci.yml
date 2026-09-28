@@ -49,6 +49,13 @@ jobs:
             caddy:2-alpine \
             caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
+      - name: Validate VPS operational scripts
+        run: |
+          sh -n deploy/scripts/preflight.sh
+          sh -n deploy/scripts/deploy.sh
+          docker info >/dev/null
+          docker compose version
+
       - name: Dependency vulnerability audit
         run: npm audit --audit-level=high
 
