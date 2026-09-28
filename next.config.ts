@@ -10,7 +10,6 @@ export function getConnectSrcOrigins(
   const origins = new Set<string>(["'self'"]);
 
   if (!isProd) {
-    // Isolated local development and test fallbacks only
     origins.add("http://localhost:8080");
     origins.add("http://127.0.0.1:8080");
   }
@@ -29,7 +28,6 @@ export function getConnectSrcOrigins(
           hostname === "[::]" ||
           hostname === "::";
 
-        // In production, reject localhost, loopback, or non-HTTPS origins from connect-src
         if (!isProd || (parsed.protocol === "https:" && !isLocalhost && !isLoopback)) {
           origins.add(parsed.origin);
         }
@@ -63,11 +61,33 @@ if (isProduction) {
 const nodeEnv = process.env.NODE_ENV || "development";
 const connectSrc = getConnectSrcOrigins(apiOrigin, nodeEnv).join(" ");
 
-export function getContentSecurityPolicy(environment: string = nodeEnv, connectSrcOrigins: string = connectSrc): string {
+export function getContentSecurityPolicy(
+  environment: string = nodeEnv,
+  connectSrcOrigins: string = connectSrc
+): string {
   const isProd = environment === "production";
   return [
-      getContentSecurityPolicy(nodeEnv, connectSrc),
-  },
+    "default-src 'self'",
+    isProd ? "script-src 'self' 'unsafe-inline'" : "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+    isProd ? "style-src 'self'" : "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: https:",
+    "font-src 'self'",
+    "connect-src " + connectSrcOrigins,
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "object-src 'none'",
+  ].join("; ");
+}
+
+const securityHeaders = [
+  { key: "X-DNS-Prefetch-Control", value: "on" },
+  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), browsing-topics=()" },
+  { key: "Content-Security-Policy", value: getContentSecurityPolicy(nodeEnv, connectSrc) },
 ];
 
 const nextConfig: NextConfig = {
@@ -81,10 +101,7 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
-      {
-        source: "/:path*",
-        headers: securityHeaders,
-      },
+      { source: "/:path*", headers: securityHeaders },
     ];
   },
 };
