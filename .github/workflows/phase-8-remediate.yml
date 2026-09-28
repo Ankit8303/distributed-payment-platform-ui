@@ -12,7 +12,7 @@ jobs:
   resolve:
     name: Resolve patched dependency tree
     runs-on: ubuntu-latest
-    if: "!contains(github.event.head_commit.message, 'Phase 8 dependency remediation')"
+    if: "!contains(github.event.head_commit.message, 'remediate Phase 8 dependency vulnerabilities')"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
