@@ -24,9 +24,9 @@ function sanitizeMessage(value: unknown): string | undefined {
   if (!trimmed) return undefined;
 
   return trimmed
-    .replace(/Bearer\\s+[A-Za-z0-9._~-]+/gi, "Bearer [REDACTED]")
+    .replace(/Bearer\s+[A-Za-z0-9._~-]+/gi, "Bearer [REDACTED]")
     .replace(
-      /((?:password|token|secret|authorization|api[_-]?key)\\s*[:=]\\s*)[^\\s,;]+/gi,
+      /((?:password|token|secret|authorization|api[_-]?key)\s*[:=]\s*)[^\s,;]+/gi,
       "$1[REDACTED]"
     )
     .slice(0, MAX_MESSAGE_LENGTH);
@@ -46,7 +46,7 @@ function sanitizePath(value: unknown): string | undefined {
   try {
     if (typeof window === "undefined") {
       return path.startsWith("/") && !path.startsWith("//")
-        ? path.split("?")[0].split("#")[0]
+        ? path.replace(/[?#].*$/, "")
         : undefined;
     }
     const parsed = new URL(path, window.location.origin);
@@ -80,8 +80,6 @@ export function buildTelemetryEvent(
 export function reportTelemetry(event: TelemetryEvent): void {
   const sanitized = buildTelemetryEvent(event);
 
-  // Local console telemetry remains available even if the reporting endpoint
-  // is unavailable. The logger independently redacts sensitive values.
   logger.error("production telemetry event", sanitized);
 
   if (typeof window === "undefined") return;
