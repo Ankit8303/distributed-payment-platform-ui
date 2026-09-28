@@ -1,4 +1,5 @@
 name: Frontend CI
+# Phase 13 recovery verification gate
 
 on:
   push:
