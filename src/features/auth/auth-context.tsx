@@ -2,17 +2,13 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import type {
-  AuthUser,
-  AuthStatus,
-  AuthContextValue,
-  LoginRequest,
-  LoginResponse,
-  RegisterRequest,
-  RegisterResponse,
+  AuthUser, AuthStatus, AuthContextValue, LoginRequest, LoginResponse,
+  RegisterRequest, RegisterResponse,
 } from "@/types/auth";
 import { loginApi, registerApi, refreshTokenApi } from "@/lib/auth/auth-api";
 import { tokenStorage } from "@/lib/auth/token-storage";
 import { decodeJwtPayload } from "@/lib/auth/jwt";
+import { registerAuthRefreshHandler } from "@/lib/api/client";
 import { logger } from "@/lib/telemetry/logger";
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -26,14 +22,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     tokenStorage.setAccessToken(tokens.accessToken);
     tokenStorage.setRefreshToken(tokens.refreshToken);
     setAccessTokenState(tokens.accessToken);
-
     const decoded = decodeJwtPayload(tokens.accessToken);
     if (decoded) {
-      setUser({
-        id: decoded.sub,
-        email: emailFallback || "user@platform.local",
-        role: decoded.role,
-      });
+      setUser({ id: decoded.sub, email: emailFallback || "user@platform.local", role: decoded.role });
       setStatus("authenticated");
     } else {
       logger.error("Failed to decode claims from backend access token");
@@ -51,12 +42,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return false;
     }
 
-    // Single-flight refresh mutex to prevent duplicate consumption of rotated token
     const existingPromise = tokenStorage.getActiveRefreshPromise();
-    if (existingPromise) {
-      const result = await existingPromise;
-      return result !== null;
-    }
+    if (existingPromise) return (await existingPromise) !== null;
 
     const refreshPromise = (async () => {
       try {
@@ -64,7 +51,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         applyAuthTokens(response, user?.email);
         return response.accessToken;
       } catch (err) {
-        logger.warn("Token refresh failed or token expired", { error: err instanceof Error ? err.message : String(err) });
+        logger.warn("Token refresh failed or token expired", {
+          error: err instanceof Error ? err.message : "Unknown authentication error",
+        });
         tokenStorage.clear();
         setAccessTokenState(null);
         setUser(null);
@@ -76,61 +65,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
 
     tokenStorage.setActiveRefreshPromise(refreshPromise);
-    const token = await refreshPromise;
-    return token !== null;
+    return (await refreshPromise) !== null;
   }, [applyAuthTokens, user?.email]);
 
-  // Initial session rehydration on mount
+  useEffect(() => {
+    registerAuthRefreshHandler(refreshSession);
+    return () => registerAuthRefreshHandler(null);
+  }, [refreshSession]);
+
   useEffect(() => {
     let mounted = true;
-
     async function initSession() {
       const rt = tokenStorage.getRefreshToken();
       if (!rt) {
-        if (mounted) {
-          setStatus("unauthenticated");
-        }
+        if (mounted) setStatus("unauthenticated");
         return;
       }
-
       try {
         const success = await refreshSession();
-        if (!success && mounted) {
-          setStatus("unauthenticated");
-        }
+        if (!success && mounted) setStatus("unauthenticated");
       } catch {
-        if (mounted) {
-          setStatus("unauthenticated");
-        }
+        if (mounted) setStatus("unauthenticated");
       }
     }
-
     initSession();
-
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, [refreshSession]);
 
-  const login = useCallback(
-    async (credentials: LoginRequest): Promise<LoginResponse> => {
-      setStatus("loading");
-      try {
-        const response = await loginApi(credentials);
-        applyAuthTokens(response, credentials.email);
-        return response;
-      } catch (err) {
-        setStatus("unauthenticated");
-        throw err;
-      }
-    },
-    [applyAuthTokens]
-  );
+  const login = useCallback(async (credentials: LoginRequest): Promise<LoginResponse> => {
+    setStatus("loading");
+    try {
+      const response = await loginApi(credentials);
+      applyAuthTokens(response, credentials.email);
+      return response;
+    } catch (err) {
+      setStatus("unauthenticated");
+      throw err;
+    }
+  }, [applyAuthTokens]);
 
   const register = useCallback(
-    async (payload: RegisterRequest): Promise<RegisterResponse> => {
-      return registerApi(payload);
-    },
+    async (payload: RegisterRequest): Promise<RegisterResponse> => registerApi(payload),
     []
   );
 
@@ -143,17 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        status,
-        accessToken,
-        login,
-        register,
-        logout,
-        refreshSession,
-      }}
-    >
+    <AuthContext.Provider value={{ user, status, accessToken, login, register, logout, refreshSession }}>
       {children}
     </AuthContext.Provider>
   );
@@ -161,8 +126,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
+  if (!context) throw new Error("useAuth must be used within an AuthProvider");
   return context;
 }
