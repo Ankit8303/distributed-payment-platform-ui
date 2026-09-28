@@ -35,6 +35,16 @@ jobs:
       - name: Verify environment configuration
         run: pwsh ./scripts/verification/verify-env.ps1
 
+      - name: Dependency vulnerability audit
+        run: npm audit --audit-level=high
+
+      - name: Dependency review for pull requests
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: high
+          fail-on-scopes: runtime
+
       - name: Gitleaks repository secret scan
         uses: gitleaks/gitleaks-action@v3
         env:
