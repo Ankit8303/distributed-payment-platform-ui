@@ -75,6 +75,17 @@ jobs:
           NEXT_PUBLIC_API_URL: https://api.example.test
         run: npm run verify
 
+      - name: Production Runtime Performance Gate
+        env:
+          NEXT_PUBLIC_API_URL: https://api.example.test
+          PERF_REQUESTS: 200
+          PERF_CONCURRENCY: 20
+          PERF_MAX_P95_MS: 500
+          PERF_MAX_P99_MS: 1000
+          PERF_MAX_ERROR_RATE: 0
+        run: npm run performance:runtime
+
+
       - name: Upload Playwright Report on Failure
         if: failure()
         uses: actions/upload-artifact@v6
