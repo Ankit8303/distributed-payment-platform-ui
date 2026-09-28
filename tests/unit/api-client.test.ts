@@ -25,8 +25,9 @@ describe("apiFetch Phase 3 reliability", () => {
     tokenStorage.setAccessToken("access-old");
     fetchMock.mockResolvedValueOnce(response(200, { ok: true }));
     await expect(apiFetch<{ ok: boolean }>("/api/v1/test")).resolves.toEqual({ ok: true });
-    const [, init] = fetchMock.mock.calls[0];
-    expect(new Headers(init.headers).get("Authorization")).toBe("Bearer access-old");
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(init).toBeDefined();
+    expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer access-old");
     expect(new Headers(init.headers).get("X-Correlation-ID")).toBeTruthy();
   });
 
