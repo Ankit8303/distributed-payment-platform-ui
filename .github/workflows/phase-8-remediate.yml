@@ -38,7 +38,6 @@ jobs:
           path: |
             package.json
             package-lock.json
-          archive: false
 
   commit:
     name: Commit patched dependency tree
