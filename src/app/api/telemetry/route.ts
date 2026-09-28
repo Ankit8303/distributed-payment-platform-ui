@@ -27,7 +27,7 @@ function localPath(value: unknown): string | undefined {
   const candidate = text(value, 500);
   if (!candidate) return undefined;
   if (!candidate.startsWith("/") || candidate.startsWith("//")) return undefined;
-  return candidate.split("?")[0].split("#")[0];
+  return candidate.replace(/[?#].*$/, "");
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -75,7 +75,6 @@ export async function POST(request: Request): Promise<Response> {
     receivedAt: new Date().toISOString(),
   };
 
-  // logger performs a second recursive redaction pass before writing to stdout.
   logger.error("client telemetry", event);
 
   return NextResponse.json(
