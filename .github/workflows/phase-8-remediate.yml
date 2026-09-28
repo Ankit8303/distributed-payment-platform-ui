@@ -21,7 +21,7 @@ jobs:
           cache: npm
       - name: Generate patched lockfile
         run: |
-          npm install --package-lock-only --ignore-scripts --no-audit \
+          npm install --package-lock-only --ignore-scripts --no-audit --force \
             next@15.5.26 \
             vitest@4.1.11 \
             postcss@8.5.28
