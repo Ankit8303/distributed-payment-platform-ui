@@ -38,6 +38,17 @@ jobs:
       - name: Verify production deployment configuration
         run: node ./scripts/deployment/verify-production-config.mjs deploy/.env.production.example
 
+      - name: Validate Docker Compose deployment contract
+        run: docker compose --env-file deploy/.env.production.example -f deploy/docker-compose.yml config
+
+      - name: Validate Caddy reverse proxy configuration
+        run: |
+          docker run --rm \
+            -e DOMAIN=app.example.com \
+            -v "${PWD}/deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2-alpine \
+            caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
       - name: Dependency vulnerability audit
         run: npm audit --audit-level=high
 
