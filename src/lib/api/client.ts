@@ -2,6 +2,9 @@ import { env } from "@/config/env";
 import type { ApiErrorResponse } from "@/types/api";
 import { tokenStorage } from "@/lib/auth/token-storage";
 
+const DEFAULT_TIMEOUT_MS = 20_000;
+const SAFE_RETRY_METHODS = new Set(["GET", "HEAD", "OPTIONS", "TRACE"]);
+
 export class ApiError extends Error {
   public readonly status: number;
   public readonly errorCode: string;
@@ -18,15 +21,40 @@ export class ApiError extends Error {
   }
 }
 
+export class ApiTimeoutError extends Error {
+  public readonly correlationId: string;
+  constructor(correlationId: string, timeoutMs: number) {
+    super(`Request timed out after ${timeoutMs}ms`);
+    this.name = "ApiTimeoutError";
+    this.correlationId = correlationId;
+  }
+}
+
+export class ApiNetworkError extends Error {
+  public readonly correlationId: string;
+  constructor(correlationId: string, cause?: unknown) {
+    super("Unable to reach the API. Please check your network connection and try again.");
+    this.name = "ApiNetworkError";
+    this.correlationId = correlationId;
+    if (cause !== undefined) this.cause = cause;
+  }
+}
+
 export interface RequestOptions extends RequestInit {
   idempotencyKey?: string;
   correlationId?: string;
   token?: string;
+  timeoutMs?: number;
+  skipAuthRefresh?: boolean;
 }
 
-/**
- * Generate a random RFC 4122 v4 UUID.
- */
+type AuthRefreshHandler = () => Promise<boolean>;
+let authRefreshHandler: AuthRefreshHandler | null = null;
+
+export function registerAuthRefreshHandler(handler: AuthRefreshHandler | null): void {
+  authRefreshHandler = handler;
+}
+
 export function generateCorrelationId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -38,25 +66,106 @@ export function generateCorrelationId(): string {
   });
 }
 
-/**
- * Foundation HTTP client wrapping fetch with RFC 7807 problem details parsing,
- * correlation tracking, and idempotency key injection.
- */
+function isSafeRetryMethod(method: string): boolean {
+  return SAFE_RETRY_METHODS.has(method.toUpperCase());
+}
+
+function createRequestSignal(
+  callerSignal: AbortSignal | null | undefined,
+  timeoutMs: number
+): { signal: AbortSignal; cleanup: () => void; timedOut: () => boolean } {
+  const controller = new AbortController();
+  let timedOut = false;
+
+  const onCallerAbort = () => controller.abort(callerSignal?.reason);
+
+  if (callerSignal) {
+    if (callerSignal.aborted) controller.abort(callerSignal.reason);
+    else callerSignal.addEventListener("abort", onCallerAbort, { once: true });
+  }
+
+  const timer = setTimeout(() => {
+    timedOut = true;
+    const reason =
+      typeof DOMException !== "undefined"
+        ? new DOMException("The request timed out", "TimeoutError")
+        : Object.assign(new Error("The request timed out"), { name: "TimeoutError" });
+    controller.abort(reason);
+  }, timeoutMs);
+
+  return {
+    signal: controller.signal,
+    timedOut: () => timedOut,
+    cleanup: () => {
+      clearTimeout(timer);
+      callerSignal?.removeEventListener("abort", onCallerAbort);
+    },
+  };
+}
+
+async function parseApiError(response: Response, correlationId: string): Promise<ApiError> {
+  let errorData: ApiErrorResponse;
+  try {
+    errorData = await response.json();
+  } catch {
+    errorData = {
+      type: "https://api.paymentledger.com/errors/HTTP_ERROR",
+      title: response.statusText || "HTTP Error",
+      status: response.status,
+      detail: `Request failed with status code ${response.status}`,
+      errorCode: "HTTP_ERROR",
+      correlationId,
+      timestamp: new Date().toISOString(),
+    };
+  }
+  return new ApiError(errorData);
+}
+
+async function executeFetch<T>(
+  url: string,
+  requestInit: RequestInit,
+  correlationId: string,
+  timeoutMs: number
+): Promise<{ response: Response; retryable: boolean }> {
+  const method = (requestInit.method || "GET").toUpperCase();
+  const requestSignal = createRequestSignal(requestInit.signal, timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...requestInit,
+      signal: requestSignal.signal,
+    });
+    return { response, retryable: isSafeRetryMethod(method) };
+  } catch (error) {
+    if (requestSignal.timedOut()) throw new ApiTimeoutError(correlationId, timeoutMs);
+    if (requestInit.signal?.aborted) throw error;
+    throw new ApiNetworkError(correlationId, error);
+  } finally {
+    requestSignal.cleanup();
+  }
+}
+
 export async function apiFetch<T>(
   endpoint: string,
   options: RequestOptions = {}
 ): Promise<T> {
-  const { idempotencyKey, correlationId, token, headers, ...customConfig } = options;
+  const {
+    idempotencyKey,
+    correlationId,
+    token,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    skipAuthRefresh = false,
+    headers,
+    signal,
+    ...customConfig
+  } = options;
 
   const resolvedCorrelationId = correlationId || generateCorrelationId();
   const requestHeaders = new Headers(headers);
-
   requestHeaders.set("Accept", "application/json");
   requestHeaders.set("X-Correlation-ID", resolvedCorrelationId);
 
-  if (idempotencyKey) {
-    requestHeaders.set("Idempotency-Key", idempotencyKey);
-  }
+  if (idempotencyKey) requestHeaders.set("Idempotency-Key", idempotencyKey);
 
   const resolvedToken = token || tokenStorage.getAccessToken();
   if (resolvedToken && !requestHeaders.has("Authorization")) {
@@ -71,32 +180,33 @@ export async function apiFetch<T>(
     ? endpoint
     : `${env.NEXT_PUBLIC_API_URL}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
 
-  const response = await fetch(url, {
-    ...customConfig,
-    headers: requestHeaders,
-  });
+  const requestInit: RequestInit = { ...customConfig, headers: requestHeaders, signal };
+  let result = await executeFetch(url, requestInit, resolvedCorrelationId, timeoutMs);
 
-  if (!response.ok) {
-    let errorData: ApiErrorResponse;
-    try {
-      errorData = await response.json();
-    } catch {
-      errorData = {
-        type: "https://api.paymentledger.com/errors/INTERNAL_SERVER_ERROR",
-        title: response.statusText || "HTTP Error",
-        status: response.status,
-        detail: `Request failed with status code ${response.status}`,
-        errorCode: "INTERNAL_SERVER_ERROR",
-        correlationId: resolvedCorrelationId,
-        timestamp: new Date().toISOString(),
-      };
+  if (
+    result.response.status === 401 &&
+    !skipAuthRefresh &&
+    !token &&
+    authRefreshHandler &&
+    result.retryable
+  ) {
+    const refreshed = await authRefreshHandler();
+    if (refreshed) {
+      const retryHeaders = new Headers(requestHeaders);
+      const refreshedToken = tokenStorage.getAccessToken();
+      if (refreshedToken) retryHeaders.set("Authorization", `Bearer ${refreshedToken}`);
+      result = await executeFetch(
+        url,
+        { ...requestInit, headers: retryHeaders, signal },
+        resolvedCorrelationId,
+        timeoutMs
+      );
     }
-    throw new ApiError(errorData);
   }
 
-  if (response.status === 204) {
-    return {} as T;
+  if (!result.response.ok) {
+    throw await parseApiError(result.response, resolvedCorrelationId);
   }
-
-  return response.json();
+  if (result.response.status === 204) return {} as T;
+  return result.response.json();
 }
