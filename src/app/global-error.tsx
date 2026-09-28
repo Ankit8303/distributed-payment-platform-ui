@@ -6,25 +6,23 @@ import {
   extractSafeDetails,
   type BoundaryError,
 } from "@/components/feedback/error-boundary-view";
+import { reportTelemetry } from "@/lib/telemetry/report";
 
 export interface GlobalErrorProps {
   error: BoundaryError;
   reset: () => void;
 }
 
-/**
- * Global Root Error Boundary.
- *
- * Implements:
- * - Next.js root global error boundary replacing root html/body upon layout failure.
- * - Self-contained: does NOT depend on AuthProvider, QueryClientProvider, or API context.
- * - Semantic HTML document structure (<html> and <body>).
- * - Safe error presentation with zero stack traces or secret leakage.
- * - RFC 7807 problem details and diagnostic correlation ID support.
- * - Safe manual recovery via reset() and navigation fallback.
- */
 export default function GlobalError({ error, reset }: GlobalErrorProps) {
   useEffect(() => {
+    reportTelemetry({
+      type: "client_error",
+      message: error.message || "Global application error",
+      errorName: error.name,
+      correlationId: error.correlationId,
+      status: error.status,
+    });
+
     if (process.env.NODE_ENV === "development") {
       console.error("[GlobalError Boundary Captured]:", error.name, error.message);
     }

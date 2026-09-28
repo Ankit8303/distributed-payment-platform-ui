@@ -1,6 +1,7 @@
 import { env } from "@/config/env";
 import type { ApiErrorResponse } from "@/types/api";
 import { tokenStorage } from "@/lib/auth/token-storage";
+import { reportTelemetry } from "@/lib/telemetry/report";
 
 const DEFAULT_TIMEOUT_MS = 20_000;
 const SAFE_RETRY_METHODS = new Set(["GET", "HEAD", "OPTIONS", "TRACE"]);
@@ -193,33 +194,74 @@ export async function apiFetch<T>(
     ? endpoint
     : `${env.NEXT_PUBLIC_API_URL}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
 
-  const requestInit: RequestInit = { ...customConfig, headers: requestHeaders, signal };
-  let result = await executeFetch(url, requestInit, resolvedCorrelationId, timeoutMs);
+  try {
+    const requestInit: RequestInit = { ...customConfig, headers: requestHeaders, signal };
+    let result = await executeFetch(url, requestInit, resolvedCorrelationId, timeoutMs);
 
-  if (
-    result.response.status === 401 &&
-    !skipAuthRefresh &&
-    !token &&
-    authRefreshHandler &&
-    result.retryable
-  ) {
-    const refreshed = await runAuthRefreshOnce();
-    if (refreshed) {
-      const retryHeaders = new Headers(requestHeaders);
-      const refreshedToken = tokenStorage.getAccessToken();
-      if (refreshedToken) retryHeaders.set("Authorization", `Bearer ${refreshedToken}`);
-      result = await executeFetch(
-        url,
-        { ...requestInit, headers: retryHeaders, signal },
-        resolvedCorrelationId,
-        timeoutMs
-      );
+    if (
+      result.response.status === 401 &&
+      !skipAuthRefresh &&
+      !token &&
+      authRefreshHandler &&
+      result.retryable
+    ) {
+      const refreshed = await runAuthRefreshOnce();
+      if (refreshed) {
+        const retryHeaders = new Headers(requestHeaders);
+        const refreshedToken = tokenStorage.getAccessToken();
+        if (refreshedToken) retryHeaders.set("Authorization", `Bearer ${refreshedToken}`);
+        result = await executeFetch(
+          url,
+          { ...requestInit, headers: retryHeaders, signal },
+          resolvedCorrelationId,
+          timeoutMs
+        );
+      }
     }
-  }
 
-  if (!result.response.ok) {
-    throw await parseApiError(result.response, resolvedCorrelationId);
+    if (!result.response.ok) {
+      throw await parseApiError(result.response, resolvedCorrelationId);
+    }
+    if (result.response.status === 204) return {} as T;
+    return result.response.json();
+  } catch (error) {
+    if (error instanceof ApiError) {
+      reportTelemetry({
+        type: "api_error",
+        message: error.errorCode || error.message,
+        errorName: error.name,
+        correlationId: error.correlationId || resolvedCorrelationId,
+        status: error.status,
+        path: endpoint,
+      });
+    } else if (error instanceof ApiTimeoutError) {
+      reportTelemetry({
+        type: "api_timeout",
+        message: error.message,
+        errorName: error.name,
+        correlationId: error.correlationId,
+        path: endpoint,
+      });
+    } else if (error instanceof ApiNetworkError) {
+      reportTelemetry({
+        type: "api_network_error",
+        message: error.message,
+        errorName: error.name,
+        correlationId: error.correlationId,
+        path: endpoint,
+      });
+    } else if (
+      !(error instanceof DOMException && error.name === "AbortError")
+    ) {
+      reportTelemetry({
+        type: "client_error",
+        message: error instanceof Error ? error.message : "Unexpected API client failure",
+        errorName: error instanceof Error ? error.name : "UnknownError",
+        correlationId: resolvedCorrelationId,
+        path: endpoint,
+      });
+    }
+
+    throw error;
   }
-  if (result.response.status === 204) return {} as T;
-  return result.response.json();
 }

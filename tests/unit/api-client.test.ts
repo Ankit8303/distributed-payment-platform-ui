@@ -4,6 +4,10 @@ import {
 } from "@/lib/api/client";
 import { tokenStorage } from "@/lib/auth/token-storage";
 
+vi.mock("@/lib/telemetry/report", () => ({
+  reportTelemetry: vi.fn(),
+}));
+
 const fetchMock = vi.fn();
 
 function response(status: number, body: unknown = {}) {

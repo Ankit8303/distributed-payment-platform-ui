@@ -2,25 +2,24 @@
 
 import React, { useEffect } from "react";
 import { ErrorBoundaryView, type BoundaryError } from "@/components/feedback/error-boundary-view";
+import { reportTelemetry } from "@/lib/telemetry/report";
 
 export interface RootErrorProps {
   error: BoundaryError;
   reset: () => void;
 }
 
-/**
- * Root Application Segment Error Boundary.
- *
- * Implements:
- * - Client component conforming to Next.js segment error boundary contract.
- * - Safe user-facing error presentation without leaking internal stack traces or secrets.
- * - Accessible heading and focusable controls.
- * - Safe manual recovery via reset() without automatic financial mutation replay.
- * - RFC 7807 problem detail and diagnostic correlation ID support.
- */
 export default function RootError({ error, reset }: RootErrorProps) {
   useEffect(() => {
-    // In production, avoid logging sensitive exception details or credentials
+    reportTelemetry({
+      type: "client_error",
+      message: error.message || "Root application error",
+      errorName: error.name,
+      correlationId: error.correlationId,
+      status: error.status,
+      path: typeof window !== "undefined" ? window.location.pathname : undefined,
+    });
+
     if (process.env.NODE_ENV === "development") {
       console.error("[RootError Boundary Captured]:", error.name, error.message);
     }

@@ -2,25 +2,24 @@
 
 import React, { useEffect } from "react";
 import { ErrorBoundaryView, type BoundaryError } from "@/components/feedback/error-boundary-view";
+import { reportTelemetry } from "@/lib/telemetry/report";
 
 export interface AdminErrorProps {
   error: BoundaryError;
   reset: () => void;
 }
 
-/**
- * Admin Segment Error Boundary.
- *
- * Implements:
- * - Next.js error boundary for all administrative routes under `src/app/(admin)`.
- * - Safe admin error presentation with zero sensitive system or confidential ledger data leakage.
- * - Does NOT bypass authentication or ProtectedRoute role enforcement.
- * - Does NOT automatically redirect unauthorized users into protected admin routes.
- * - Accessible heading, visible focus rings, and safe manual recovery via reset().
- * - RFC 7807 problem details and diagnostic correlation ID support.
- */
 export default function AdminError({ error, reset }: AdminErrorProps) {
   useEffect(() => {
+    reportTelemetry({
+      type: "client_error",
+      message: error.message || "Administrative application error",
+      errorName: error.name,
+      correlationId: error.correlationId,
+      status: error.status,
+      path: typeof window !== "undefined" ? window.location.pathname : undefined,
+    });
+
     if (process.env.NODE_ENV === "development") {
       console.error("[AdminError Boundary Captured]:", error.name, error.message);
     }
