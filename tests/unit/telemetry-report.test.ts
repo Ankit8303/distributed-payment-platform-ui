@@ -32,6 +32,17 @@ describe("telemetry report sanitization", () => {
     expect(event.path).toBeUndefined();
   });
 
+  it("redacts credentials before network transmission", () => {
+    const event = buildTelemetryEvent({
+      type: "client_error",
+      message: "request failed password=secret Bearer abc.def.ghi",
+    });
+
+    expect(event.message).toBe(
+      "request failed password=[REDACTED] Bearer [REDACTED]"
+    );
+  });
+
   it("bounds oversized messages", () => {
     const event = buildTelemetryEvent({
       type: "client_error",
