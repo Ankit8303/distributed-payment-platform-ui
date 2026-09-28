@@ -89,22 +89,35 @@ jobs:
           echo "Starting container in background..."
           docker run -d --name frontend-smoke -p 3000:3000 distributed-payment-platform-ui:ci
           
-          echo "Waiting for container readiness..."
+          echo "Waiting for container healthcheck..."
           READY=0
-          for i in $(seq 1 20); do
-            if curl -s -f http://127.0.0.1:3000/ > /dev/null; then
-              echo "Container health smoke probe succeeded (HTTP 200 OK) on attempt $i."
+          for i in $(seq 1 30); do
+            STATUS="$(docker inspect --format='{{.State.Health.Status}}' frontend-smoke 2>/dev/null || true)"
+            echo "Healthcheck attempt $i: ${STATUS:-starting}"
+            if [ "$STATUS" = "healthy" ]; then
               READY=1
               break
             fi
+            if [ "$STATUS" = "unhealthy" ]; then
+              echo "ERROR: Container healthcheck reported unhealthy. Logs:"
+              docker logs frontend-smoke
+              exit 1
+            fi
             sleep 1
           done
-          
+
           if [ $READY -ne 1 ]; then
-            echo "ERROR: Container failed to respond to smoke probe within 20s. Logs:"
+            echo "ERROR: Container did not become healthy within 30s. Logs:"
             docker logs frontend-smoke
             exit 1
           fi
+
+          curl -sS -f http://127.0.0.1:3000/api/healthz > /tmp/healthz.json
+          grep -q '"status":"ok"' /tmp/healthz.json
+          curl -sS -f http://127.0.0.1:3000/api/readyz > /tmp/readyz.json
+          grep -q '"status":"ready"' /tmp/readyz.json
+          curl -sS -f http://127.0.0.1:3000/ > /dev/null
+          echo "Runtime health, readiness, and landing-page smoke probes passed."
 
       - name: Verify Production Security Headers
         run: |
