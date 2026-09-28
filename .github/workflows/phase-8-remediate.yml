@@ -1,0 +1,60 @@
+name: Phase 8 Dependency Remediation
+
+on:
+  push:
+    branches:
+      - fix/frontend-phase-8-dependency-security
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    name: Resolve patched dependency tree
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, 'Phase 8 dependency remediation')"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Generate patched lockfile
+        run: |
+          npm install --package-lock-only --ignore-scripts --no-audit \
+            next@15.5.26 \
+            vitest@4.1.11 \
+            postcss@8.5.28
+          npm audit --audit-level=high
+          npm test
+      - name: Upload generated dependency manifests
+        uses: actions/upload-artifact@v7
+        with:
+          name: phase-8-dependency-manifests
+          path: |
+            package.json
+            package-lock.json
+          archive: false
+
+  commit:
+    name: Commit patched dependency tree
+    needs: resolve
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/frontend-phase-8-dependency-security
+      - uses: actions/download-artifact@v8
+        with:
+          name: phase-8-dependency-manifests
+          path: .
+      - name: Commit patched dependency manifests
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git diff --cached --quiet && exit 0
+          git commit -m "fix: remediate Phase 8 dependency vulnerabilities"
+          git push origin HEAD:fix/frontend-phase-8-dependency-security
