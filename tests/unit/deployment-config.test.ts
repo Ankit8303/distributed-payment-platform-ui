@@ -11,16 +11,39 @@ describe("production deployment contract", () => {
 
     expect(compose).toContain("NEXT_PUBLIC_API_URL");
     expect(compose).toContain("condition: service_healthy");
-    expect(compose).toContain('restart: unless-stopped');
+    expect(compose).toContain("restart: unless-stopped");
     expect(compose).toContain('"80:80"');
     expect(compose).toContain('"443:443"');
     expect(caddy).toContain("reverse_proxy frontend:3000");
     expect(caddy).toContain("encode gzip zstd");
   });
 
+  it("enforces container resource and privilege boundaries", () => {
+    const compose = fs.readFileSync(path.join(root, "deploy/docker-compose.yml"), "utf8");
+
+    expect(compose).toContain("read_only: true");
+    expect(compose).toContain("cap_drop:");
+    expect(compose).toContain("no-new-privileges:true");
+    expect(compose).toContain("pids_limit:");
+    expect(compose).toContain("mem_limit:");
+    expect(compose).toContain("cpus:");
+    expect(compose).toContain("max-size: \"10m\"");
+  });
+
   it("keeps production configuration free of application secrets", () => {
     const envExample = fs.readFileSync(path.join(root, "deploy/.env.production.example"), "utf8");
     expect(envExample).not.toMatch(/(SECRET|PASSWORD|TOKEN|PRIVATE_KEY|API_KEY)=/i);
+  });
+
+  it("ships executable host and deployment operational gates", () => {
+    const preflight = fs.readFileSync(path.join(root, "deploy/scripts/preflight.sh"), "utf8");
+    const deploy = fs.readFileSync(path.join(root, "deploy/scripts/deploy.sh"), "utf8");
+
+    expect(preflight).toContain("docker compose version");
+    expect(preflight).toContain("docker info");
+    expect(deploy).toContain("docker compose");
+    expect(deploy).toContain("verify-production-config.mjs");
+    expect(deploy).toContain("frontend healthy");
   });
 
   it("ships an executable deployment configuration gate", () => {
