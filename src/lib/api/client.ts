@@ -134,7 +134,7 @@ async function parseApiError(response: Response, correlationId: string): Promise
   return new ApiError(errorData);
 }
 
-async function executeFetch<T>(
+async function executeFetch(
   url: string,
   requestInit: RequestInit,
   correlationId: string,
