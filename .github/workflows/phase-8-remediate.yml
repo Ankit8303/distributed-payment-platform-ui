@@ -23,7 +23,7 @@ jobs:
       - name: Generate patched lockfile
         run: |
           npm pkg set 'dependencies.next=15.5.26' 'devDependencies.vitest=4.1.11' 'devDependencies.postcss=8.5.28'
-          npm pkg set 'overrides.esbuild=0.28.2' 'overrides.postcss=$postcss'
+          npm pkg set 'overrides.esbuild=0.28.2' 'overrides.postcss=$postcss' 'overrides.vite=6.4.3'
           npm install --package-lock-only --ignore-scripts --no-audit \
             next@15.5.26 \
             vitest@4.1.11 \
