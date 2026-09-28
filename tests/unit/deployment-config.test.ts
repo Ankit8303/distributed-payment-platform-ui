@@ -27,7 +27,15 @@ describe("production deployment contract", () => {
     expect(compose).toContain("pids_limit:");
     expect(compose).toContain("mem_limit:");
     expect(compose).toContain("cpus:");
-    expect(compose).toContain("max-size: \"10m\"");
+    expect(compose).toContain('max-size: "10m"');
+  });
+
+  it("defines runtime health signals for both production services", () => {
+    const compose = fs.readFileSync(path.join(root, "deploy/docker-compose.yml"), "utf8");
+
+    expect(compose).toContain("http://127.0.0.1:3000/api/healthz");
+    expect(compose).toContain("http://127.0.0.1:2019/config/");
+    expect((compose.match(/healthcheck:/g) || []).length).toBeGreaterThanOrEqual(2);
   });
 
   it("keeps production configuration free of application secrets", () => {
@@ -35,15 +43,19 @@ describe("production deployment contract", () => {
     expect(envExample).not.toMatch(/(SECRET|PASSWORD|TOKEN|PRIVATE_KEY|API_KEY)=/i);
   });
 
-  it("ships executable host and deployment operational gates", () => {
+  it("ships executable host, deployment, and recovery gates", () => {
     const preflight = fs.readFileSync(path.join(root, "deploy/scripts/preflight.sh"), "utf8");
     const deploy = fs.readFileSync(path.join(root, "deploy/scripts/deploy.sh"), "utf8");
+    const recover = fs.readFileSync(path.join(root, "deploy/scripts/recover.sh"), "utf8");
 
     expect(preflight).toContain("docker compose version");
     expect(preflight).toContain("docker info");
     expect(deploy).toContain("docker compose");
     expect(deploy).toContain("verify-production-config.mjs");
     expect(deploy).toContain("frontend healthy");
+    expect(deploy).toContain("caddy healthy");
+    expect(recover).toContain("restart frontend caddy");
+    expect(recover).toContain("Recovery verification passed.");
   });
 
   it("ships an executable deployment configuration gate", () => {

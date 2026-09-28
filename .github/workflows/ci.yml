@@ -1,4 +1,5 @@
 name: Frontend CI
+# Phase 13 recovery verification gate
 
 on:
   push:
@@ -53,6 +54,7 @@ jobs:
         run: |
           sh -n deploy/scripts/preflight.sh
           sh -n deploy/scripts/deploy.sh
+          sh -n deploy/scripts/recover.sh
           docker info >/dev/null
           docker compose version
 
@@ -164,7 +166,37 @@ jobs:
           curl -sS -f http://127.0.0.1:3000/api/readyz > /tmp/readyz.json
           grep -q '"status":"ready"' /tmp/readyz.json
           curl -sS -f http://127.0.0.1:3000/ > /dev/null
-          echo "Runtime health, readiness, and landing-page smoke probes passed."
+          echo "Initial runtime health, readiness, and landing-page smoke probes passed."
+
+          echo "Testing container restart recovery..."
+          docker restart frontend-smoke >/dev/null
+          READY=0
+          for i in $(seq 1 30); do
+            STATUS="$(docker inspect --format='{{.State.Health.Status}}' frontend-smoke 2>/dev/null || true)"
+            echo "Recovery healthcheck attempt $i: ${STATUS:-starting}"
+            if [ "$STATUS" = "healthy" ]; then
+              READY=1
+              break
+            fi
+            if [ "$STATUS" = "unhealthy" ]; then
+              echo "ERROR: Container failed healthcheck after restart. Logs:"
+              docker logs frontend-smoke
+              exit 1
+            fi
+            sleep 1
+          done
+
+          if [ $READY -ne 1 ]; then
+            echo "ERROR: Container did not recover to healthy state after restart. Logs:"
+            docker logs frontend-smoke
+            exit 1
+          fi
+
+          curl -sS -f http://127.0.0.1:3000/api/healthz > /tmp/recovered-healthz.json
+          grep -q '"status":"ok"' /tmp/recovered-healthz.json
+          curl -sS -f http://127.0.0.1:3000/api/readyz > /tmp/recovered-readyz.json
+          grep -q '"status":"ready"' /tmp/recovered-readyz.json
+          echo "Container restart recovery verification passed."
 
       - name: Verify Production Security Headers
         run: |

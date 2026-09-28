@@ -38,5 +38,20 @@ done
 
 docker compose --env-file "$ENV_FILE" -f deploy/docker-compose.yml up -d caddy
 
+echo "Waiting for Caddy health..."
+for i in $(seq 1 30); do
+  status="$(docker compose --env-file "$ENV_FILE" -f deploy/docker-compose.yml ps --format '{{.Service}} {{.Health}}' 2>/dev/null || true)"
+  echo "$status"
+  if printf '%s\n' "$status" | grep -q '^caddy healthy$'; then
+    break
+  fi
+  [ "$i" -eq 30 ] && {
+    echo "ERROR: Caddy did not become healthy." >&2
+    docker compose --env-file "$ENV_FILE" -f deploy/docker-compose.yml logs --tail=100 caddy >&2 || true
+    exit 1
+  }
+  sleep 2
+done
+
 echo "Deployment started successfully."
 docker compose --env-file "$ENV_FILE" -f deploy/docker-compose.yml ps
