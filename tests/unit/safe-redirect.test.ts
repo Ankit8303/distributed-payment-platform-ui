@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { getSafeRedirectUrl } from "@/lib/auth/safe-redirect";
-import nextConfig, { getConnectSrcOrigins } from "../../next.config";
+import nextConfig, { getConnectSrcOrigins, getContentSecurityPolicy } from "../../next.config";
 
 describe("Phase F8-A — Safe Redirect Validation", () => {
   describe("Valid Internal Redirects", () => {
@@ -125,18 +125,13 @@ describe("Phase F8-A — CSP connect-src Dynamic Configuration", () => {
 
 
 describe("Phase 2 — Production CSP Security Hardening", () => {
-  it("removes unsafe-eval from production script policy", async () => {
-    const headersConfig = await nextConfig.headers!();
-    const allPathHeaders = headersConfig.find((h) => h.source === "/:path*");
-    const csp = allPathHeaders?.headers.find((h) => h.key === "Content-Security-Policy")?.value;
-    expect(csp).toBeDefined();
+  it("removes unsafe-eval from production script policy", () => {
+    const csp = getContentSecurityPolicy("production", "'self' https://api.production.example.com");
     expect(csp).not.toContain("unsafe-eval");
   });
 
-  it("does not allow inline styles in production CSP", async () => {
-    const headersConfig = await nextConfig.headers!();
-    const allPathHeaders = headersConfig.find((h) => h.source === "/:path*");
-    const csp = allPathHeaders?.headers.find((h) => h.key === "Content-Security-Policy")?.value;
+  it("does not allow inline styles in production CSP", () => {
+    const csp = getContentSecurityPolicy("production", "'self' https://api.production.example.com");
     expect(csp).toContain("style-src 'self'");
     expect(csp).not.toContain("style-src 'self' 'unsafe-inline'");
   });
@@ -146,15 +141,13 @@ describe("Phase 2 — Production CSP Security Hardening", () => {
     expect(origins).toEqual(["'self'", "https://api.production.example.com"]);
   });
 
-  it("keeps development CSP compatible with Next.js development tooling", async () => {
-    const { getContentSecurityPolicy } = await import("../../next.config");
+  it("keeps development CSP compatible with Next.js development tooling", () => {
     const csp = getContentSecurityPolicy("development", "'self' http://localhost:8080");
     expect(csp).toContain("script-src 'self' 'unsafe-eval' 'unsafe-inline'");
     expect(csp).toContain("style-src 'self' 'unsafe-inline'");
   });
 
-  it("includes defense-in-depth object-src restriction", async () => {
-    const { getContentSecurityPolicy } = await import("../../next.config");
+  it("includes defense-in-depth object-src restriction", () => {
     expect(getContentSecurityPolicy("production", "'self'")).toContain("object-src 'none'");
   });
 }
