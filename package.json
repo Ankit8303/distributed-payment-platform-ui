@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "verify:env": "powershell -ExecutionPolicy Bypass -File ./scripts/verification/verify-env.ps1",
-    "verify": "npm run typecheck && npm run lint && npm run test && npm run build"
+    "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
+    "performance:runtime": "node ./scripts/performance/runtime-benchmark.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.62.11",
