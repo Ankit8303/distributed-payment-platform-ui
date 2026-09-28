@@ -18,6 +18,20 @@ export interface TelemetryEvent {
 const MAX_MESSAGE_LENGTH = 500;
 const MAX_PATH_LENGTH = 500;
 
+function sanitizeMessage(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+
+  return trimmed
+    .replace(/Bearer\\s+[A-Za-z0-9._~-]+/gi, "Bearer [REDACTED]")
+    .replace(
+      /((?:password|token|secret|authorization|api[_-]?key)\\s*[:=]\\s*)[^\\s,;]+/gi,
+      "$1[REDACTED]"
+    )
+    .slice(0, MAX_MESSAGE_LENGTH);
+}
+
 function safeText(value: unknown, maxLength: number): string | undefined {
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
@@ -49,7 +63,7 @@ export function buildTelemetryEvent(
 ): TelemetryEvent {
   return {
     type: event.type,
-    message: safeText(event.message, MAX_MESSAGE_LENGTH) || "Unknown client error",
+    message: sanitizeMessage(event.message) || "Unknown client error",
     ...(safeText(event.correlationId, 100)
       ? { correlationId: safeText(event.correlationId, 100) }
       : {}),
