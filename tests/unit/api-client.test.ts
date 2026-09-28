@@ -51,6 +51,38 @@ describe("apiFetch Phase 3 reliability", () => {
     expect(new Headers(retryInit.headers).get("Authorization")).toBe("Bearer access-new");
   });
 
+  it("deduplicates concurrent safe-request refresh callbacks", async () => {
+    tokenStorage.setAccessToken("access-old");
+    fetchMock
+      .mockResolvedValueOnce(response(401, {
+        status: 401, title: "Unauthorized", detail: "expired", errorCode: "UNAUTHORIZED",
+      }))
+      .mockResolvedValueOnce(response(401, {
+        status: 401, title: "Unauthorized", detail: "expired", errorCode: "UNAUTHORIZED",
+      }))
+      .mockResolvedValueOnce(response(200, { id: 1 }))
+      .mockResolvedValueOnce(response(200, { id: 2 }));
+
+    let resolveRefresh: ((value: boolean) => void) | undefined;
+    const refreshPromise = new Promise<boolean>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    const refresh = vi.fn(() => refreshPromise.then((ok) => {
+      tokenStorage.setAccessToken("access-new");
+      return ok;
+    }));
+    registerAuthRefreshHandler(refresh);
+
+    const first = apiFetch<{ id: number }>("/api/v1/accounts/1");
+    const second = apiFetch<{ id: number }>("/api/v1/accounts/2");
+
+    resolveRefresh?.(true);
+
+    await expect(Promise.all([first, second])).resolves.toEqual([{ id: 1 }, { id: 2 }]);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
   it("does not retry a financial mutation after 401", async () => {
     tokenStorage.setAccessToken("access-old");
     fetchMock.mockResolvedValueOnce(response(401, {
