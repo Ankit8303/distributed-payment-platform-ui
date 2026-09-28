@@ -42,5 +42,6 @@ export async function refreshTokenApi(data: RefreshTokenRequest): Promise<LoginR
   return apiFetch<LoginResponse>("/api/v1/auth/refresh", {
     method: "POST",
     body: JSON.stringify(data),
+    skipAuthRefresh: true,
   });
 }
