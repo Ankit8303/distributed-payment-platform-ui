@@ -52,9 +52,13 @@ jobs:
         run: npx playwright test tests/e2e/accessibility.spec.ts
 
       - name: Production Build Verification
+        env:
+          NEXT_PUBLIC_API_URL: https://api.example.test
         run: npm run build
 
       - name: Full Verification Script
+        env:
+          NEXT_PUBLIC_API_URL: https://api.example.test
         run: npm run verify
 
       - name: Upload Playwright Report on Failure
@@ -78,12 +82,12 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build Production Docker Image
-        run: docker build -t distributed-payment-platform-ui:ci .
+        run: docker build --build-arg NEXT_PUBLIC_API_URL=https://api.example.test -t distributed-payment-platform-ui:ci .
 
       - name: Run Container Smoke Verification
         run: |
           echo "Starting container in background..."
-          docker run -d --name frontend-smoke -p 3000:3000 -e NEXT_PUBLIC_API_URL=http://localhost:8080 distributed-payment-platform-ui:ci
+          docker run -d --name frontend-smoke -p 3000:3000 distributed-payment-platform-ui:ci
           
           echo "Waiting for container readiness..."
           READY=0
