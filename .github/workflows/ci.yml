@@ -52,9 +52,13 @@ jobs:
         run: npx playwright test tests/e2e/accessibility.spec.ts
 
       - name: Production Build Verification
+        env:
+          NEXT_PUBLIC_API_URL: https://api.example.test
         run: npm run build
 
       - name: Full Verification Script
+        env:
+          NEXT_PUBLIC_API_URL: https://api.example.test
         run: npm run verify
 
       - name: Upload Playwright Report on Failure
@@ -78,12 +82,12 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build Production Docker Image
-        run: docker build -t distributed-payment-platform-ui:ci .
+        run: docker build --build-arg NEXT_PUBLIC_API_URL=https://api.example.test -t distributed-payment-platform-ui:ci .
 
       - name: Run Container Smoke Verification
         run: |
           echo "Starting container in background..."
-          docker run -d --name frontend-smoke -p 3000:3000 -e NEXT_PUBLIC_API_URL=http://localhost:8080 distributed-payment-platform-ui:ci
+          docker run -d --name frontend-smoke -p 3000:3000 distributed-payment-platform-ui:ci
           
           echo "Waiting for container readiness..."
           READY=0
@@ -99,6 +103,42 @@ jobs:
           if [ $READY -ne 1 ]; then
             echo "ERROR: Container failed to respond to smoke probe within 20s. Logs:"
             docker logs frontend-smoke
+            exit 1
+          fi
+
+      - name: Verify Production Security Headers
+        run: |
+          HEADERS="$(curl -sS -D - -o /dev/null http://127.0.0.1:3000/)"
+          echo "$HEADERS"
+
+          echo "$HEADERS" | grep -qi '^strict-transport-security:' || {
+            echo "ERROR: Strict-Transport-Security header missing"
+            exit 1
+          }
+
+          echo "$HEADERS" | grep -qi '^x-content-type-options: nosniff' || {
+            echo "ERROR: X-Content-Type-Options header missing or incorrect"
+            exit 1
+          }
+
+          CSP="$(printf '%s\n' "$HEADERS" | tr -d '\r' | grep -i '^content-security-policy:' || true)"
+          if [ -z "$CSP" ]; then
+            echo "ERROR: Content-Security-Policy header missing"
+            exit 1
+          fi
+
+          printf '%s\n' "$CSP" | grep -q "object-src 'none'" || {
+            echo "ERROR: CSP object-src restriction missing"
+            exit 1
+          }
+
+          if printf '%s\n' "$CSP" | grep -q "unsafe-eval"; then
+            echo "ERROR: Production CSP contains unsafe-eval"
+            exit 1
+          fi
+
+          if printf '%s\n' "$CSP" | grep -q "style-src 'self' 'unsafe-inline'"; then
+            echo "ERROR: Production CSP permits unsafe-inline styles"
             exit 1
           fi
 

@@ -87,15 +87,16 @@ The repository provides a multi-stage, hardened Dockerfile utilizing Next.js sta
 
 ### Build Container Image
 ```bash
-docker build -t distributed-payment-platform-ui:latest .
+docker build \
+  --build-arg NEXT_PUBLIC_API_URL=https://api.example.com \
+  -t distributed-payment-platform-ui:latest .
 ```
 
-### Run Container Locally
+### Run Container
 ```bash
 docker run -d \
   --name payment-platform-ui \
   -p 3000:3000 \
-  -e NEXT_PUBLIC_API_URL=http://localhost:8080 \
   distributed-payment-platform-ui:latest
 ```
 
@@ -114,13 +115,13 @@ docker rm payment-platform-ui
 
 ## Environment Configuration
 
-Configuration is managed via `.env.example`. Only variables prefixed with `NEXT_PUBLIC_` are bundled for browser consumption.
+Configuration is managed via `.env.example`. Only browser-safe variables prefixed with `NEXT_PUBLIC_` are bundled for client consumption.
 
-| Variable | Scope | Purpose | Default / Example |
+| Variable | Scope | Purpose | Production Requirement |
 |---|---|---|---|
-| `NEXT_PUBLIC_API_URL` | Public / Browser | Base URL of Spring Boot REST backend | `http://localhost:8080` |
+| `NEXT_PUBLIC_API_URL` | Public / Browser | Base HTTPS URL of Spring Boot REST backend | **Required in Production** (HTTPS only; e.g. `https://api.paymentplatform.com`). In dev only: defaults to `http://localhost:8080`. |
 
-> **CRITICAL SECURITY INVARIANT**: Never place secret keys, database credentials, or private API tokens in `NEXT_PUBLIC_*` variables or `.env` files.
+> **CRITICAL SECURITY INVARIANT**: Never place secret keys, database credentials, or private API tokens in `NEXT_PUBLIC_*` variables or `.env` files. In production, `NEXT_PUBLIC_API_URL` MUST be supplied at build time and use HTTPS.
 
 ---
 
