@@ -44,7 +44,11 @@ jobs:
 
       - name: Validate Caddy reverse proxy configuration
         run: |
-          docker run --rm             -e DOMAIN=app.example.com             -v "${PWD}/deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro"             caddy:2-alpine             caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          docker run --rm \
+            -e DOMAIN=app.example.com \
+            -v "${PWD}/deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2-alpine \
+            caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
       - name: Validate VPS operational scripts
         run: |
@@ -209,27 +213,23 @@ jobs:
             exit 1
           }
 
-          CSP="$(printf '%s
-' "$HEADERS" | tr -d '' | grep -i '^content-security-policy:' || true)"
+          CSP="$(printf '%s\n' "$HEADERS" | tr -d '\r' | grep -i '^content-security-policy:' || true)"
           if [ -z "$CSP" ]; then
             echo "ERROR: Content-Security-Policy header missing"
             exit 1
           fi
 
-          printf '%s
-' "$CSP" | grep -q "object-src 'none'" || {
+          printf '%s\n' "$CSP" | grep -q "object-src 'none'" || {
             echo "ERROR: CSP object-src restriction missing"
             exit 1
           }
 
-          if printf '%s
-' "$CSP" | grep -q "unsafe-eval"; then
+          if printf '%s\n' "$CSP" | grep -q "unsafe-eval"; then
             echo "ERROR: Production CSP contains unsafe-eval"
             exit 1
           fi
 
-          if printf '%s
-' "$CSP" | grep -q "style-src 'self' 'unsafe-inline'"; then
+          if printf '%s\n' "$CSP" | grep -q "style-src 'self' 'unsafe-inline'"; then
             echo "ERROR: Production CSP permits unsafe-inline styles"
             exit 1
           fi

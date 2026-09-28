@@ -42,9 +42,7 @@ echo "Waiting for Caddy health..."
 for i in $(seq 1 30); do
   status="$(docker compose --env-file "$ENV_FILE" -f deploy/docker-compose.yml ps --format '{{.Service}} {{.Health}}' 2>/dev/null || true)"
   echo "$status"
-  if printf '%s\n' "$status" | grep -q '^caddy healthy
-docker compose --env-file "$ENV_FILE" -f deploy/docker-compose.yml ps
-; then
+  if printf '%s\n' "$status" | grep -q '^caddy healthy$'; then
     break
   fi
   [ "$i" -eq 30 ] && {

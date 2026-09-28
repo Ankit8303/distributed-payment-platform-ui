@@ -22,8 +22,7 @@ wait_for_health() {
   for i in $(seq 1 30); do
     status="$($COMPOSE ps --format '{{.Service}} {{.Health}}' 2>/dev/null || true)"
     echo "$status"
-    if printf '%s
-' "$status" | grep -q "^$service healthy$"; then
+    if printf '%s\n' "$status" | grep -q "^$service healthy$"; then
       return 0
     fi
     [ "$i" -eq 30 ] && return 1
