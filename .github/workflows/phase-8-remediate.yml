@@ -29,6 +29,7 @@ jobs:
             vitest@4.1.11 \
             postcss@8.5.28
           npm audit --audit-level=high
+          npm ci --ignore-scripts
           npm test
       - name: Upload generated dependency manifests
         uses: actions/upload-artifact@v7
