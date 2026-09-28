@@ -50,9 +50,22 @@ export interface RequestOptions extends RequestInit {
 
 type AuthRefreshHandler = () => Promise<boolean>;
 let authRefreshHandler: AuthRefreshHandler | null = null;
+let activeAuthRefreshPromise: Promise<boolean> | null = null;
 
 export function registerAuthRefreshHandler(handler: AuthRefreshHandler | null): void {
   authRefreshHandler = handler;
+  if (!handler) activeAuthRefreshPromise = null;
+}
+
+async function runAuthRefreshOnce(): Promise<boolean> {
+  if (!authRefreshHandler) return false;
+  if (activeAuthRefreshPromise) return activeAuthRefreshPromise;
+
+  activeAuthRefreshPromise = authRefreshHandler().finally(() => {
+    activeAuthRefreshPromise = null;
+  });
+
+  return activeAuthRefreshPromise;
 }
 
 export function generateCorrelationId(): string {
@@ -190,7 +203,7 @@ export async function apiFetch<T>(
     authRefreshHandler &&
     result.retryable
   ) {
-    const refreshed = await authRefreshHandler();
+    const refreshed = await runAuthRefreshOnce();
     if (refreshed) {
       const retryHeaders = new Headers(requestHeaders);
       const refreshedToken = tokenStorage.getAccessToken();
